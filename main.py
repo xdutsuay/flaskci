@@ -1,77 +1,83 @@
 from flask import Flask, request, redirect, url_for
-from hdd import *
-import hdd
+import requests
 
 app = Flask(__name__)
 
+def convert_date_format(date="26-02-96"):
+    temp_date = date.split("-")
+    return f"{temp_date[0]} {temp_date[1]} {temp_date[2]}"
 
-# @app.route('/hello')
-# def hello_world():
-#     return 'hello world'
+response = requests.get("https://s3-ap-southeast-1.amazonaws.com/he-public-data/bankAccountdde24ad.json")
+response.raise_for_status()
+data = response.json()
 
 @app.route('/transaction/<date>')
 def td(date):
-    date = hdd.convert_date_format(date)
-    transactions = {"Transactions": []
-                    }
+    date = convert_date_format(date)
+    transactions = {"Transactions": []}
     for small_data in data:
         if small_data["Date"] == date:
             transactions["Transactions"].append(small_data["Transaction Details"])
 
     return transactions
 
-    pass
-
-
 @app.route('/balance/<date>')
 def bd(date):
-    date = hdd.convert_date_format(date)
-    # print(date)
+    date = convert_date_format(date)
     for small_data in data:
-        # print(data)
-        # print(small_data["Date"])
         if small_data["Date"] == date:
             return small_data["Balance AMT"]
         elif small_data["Date"] != data[-1]["Date"]:
-            # print(small_data["Date"],data[-1]["Date"],date)
             continue
         else:
             return "No Record for specified date"
-    # print(type(small_data))
-    pass
-
 
 @app.route('/details/<id>')
-def deid(id):  # id not given in data assuming index of data as id
-
+def deid(id): 
     return data[int(id)]
-    pass
 
+@app.route('/add', methods=['GET', 'POST']) 
+def add():
+    if request.method == 'POST':
+        new_data = {
+            "Account No": request.form["ACCNO"],
+            "Date": request.form["DATE"],
+            "Transaction Details": request.form["TD"],
+            "Value Date": request.form["VAL"],
+            "Withdrawal AMT": request.form["WIT"],
+            "Deposit AMT": request.form["DP"],
+            "Balance AMT": request.form["BAL"]
+        }
+        data.append(new_data)
+        return redirect(url_for('addmoredata'))
+    else:
+        return '''
+            <html>
+               <body>
+                  <form action = "http://localhost:5000/add" method = "post">
+                     <p>Enter Account no:</p>
+                     <p><input type = "text" name = "ACCNO" /></p>
+                      <p>Enter Date like "29 Jun 17"</p>
+                      <p><input type = "text" name = "DATE" /></p>
+                      <p>Enter Transaction Details</p>
+                      <p><input type = "text" name = "TD" /></p>
+                      <p>Enter Value Date</p>
+                      <p><input type = "text" name = "VAL" /></p>
+                      <p>Enter Withdrawl AMT</p>
+                      <p><input type = "text" name = "WIT" /></p>
+                      <p>Enter Deposit AMT</p>
+                      <p><input type = "text" name = "DP" /></p>
+                      <p>Enter Balance AMT</p>
+                      <p><input type = "text" name = "BAL" /></p>
+                     <p><input type = "submit" value = "submit" /></p>
+                  </form>
+               </body>
+            </html>
+        '''
 
 @app.route('/addmoredata')
 def addmoredata():
     return 'welcome '
-
-
-@app.route('/add')  # post req to add more data in appropriate formate
-def add():
-    # basically hitting this url should redirect to addmoredata.html and that should take values and provide to backend
-    # redirect(url_for('addmoredata'))
-    # if request.method == 'POST':
-    #     account = request.form["ACCNO"]
-    #     date = request.form["DATE"]
-    #     td = request.form["TD"]
-    #     val = request.form["VAL"]
-    #     wit = request.form["WITH"]
-    #     dp = request.form["DP"]
-    #     bal = request.form["BAL"]
-    #     return redirect(url_for('success', accno=account))
-
-    pass
-
-
-# deploy of aws lambda
-
 
 if __name__ == '__main__':
     app.run()
